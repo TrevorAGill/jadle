@@ -2,15 +2,17 @@ import com.google.gson.Gson;
 import dao.Sql2oFoodtypeDao;
 import dao.Sql2oRestaurantDao;
 import dao.Sql2oReviewDao;
+import exceptions.ApiException;
 import models.Foodtype;
 import models.Restaurant;
 import models.Review;
 import org.sql2o.Connection;
 import org.sql2o.Sql2o;
 
-import static spark.Spark.after;
-import static spark.Spark.get;
-import static spark.Spark.post;
+import java.util.HashMap;
+import java.util.Map;
+
+import static spark.Spark.*;
 
 public class App {
     public static void main(String[] args) {
@@ -44,7 +46,12 @@ public class App {
         get("/restaurants/:id", "application/json", (req, res) -> { //accept a request in format JSON from an app
             res.type("application/json");
             int restaurantId = Integer.parseInt(req.params("id"));
-            return gson.toJson(restaurantDao.findById(restaurantId));
+            Restaurant restaurantToFind = restaurantDao.findById(restaurantId);
+            if (restaurantToFind == null){
+                throw new RuntimeException(String.format("No restaurant with the id: %s exists", req.params("id")));
+            }
+
+            return gson.toJson(restaurantToFind);
         });
 
         //CREATE
@@ -88,7 +95,17 @@ public class App {
 //        });
 
 
-        //FILTERS
+//        FILTERS
+        exception(ApiException.class, (exc, req, res) -> {
+            RuntimeException err = exc;
+            Map<String, Object> jsonMap = new HashMap<>();
+//            jsonMap.put("status", err.getStatusCode());
+            jsonMap.put("errorMessage", err.getMessage());
+            res.type("application/json"); //after does not run in case of an exception.
+//            res.status(err.getStatusCode()); //set the status
+            res.body(gson.toJson(jsonMap));  //set the output.
+        });
+
         after((req, res) ->{
             res.type("application/json");
         });
